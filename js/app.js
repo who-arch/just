@@ -175,6 +175,7 @@ async function renderNewRepo() {
     if (!/^[a-zA-Z0-9._-]{1,80}$/.test(name)) return toast('Invalid repo name', 'error');
     try {
       const repo = await DB.createRepo(state.user.username, name, document.getElementById('repoPrivate').checked, document.getElementById('repoDesc').value);
+      state.branch = 'main';
       toast('Repository created', 'success');
       api.navigate(`#/repo/${repo.id}`);
     } catch (e) { toast(e.message, 'error'); }
@@ -204,11 +205,19 @@ const BUILTIN_ROUTES = [
   { pattern: /^#\/explore$/, handler: renderExplore },
   { pattern: /^#\/new$/, handler: renderNewRepo },
   { pattern: /^#\/profile(?:\/([^/]+))?$/, handler: async (u) => renderProfile(api, u || null) },
-  { pattern: /^#\/repo\/([^/]+)\/([^/]+)$/, handler: async (o, n) => renderRepo(api, o, n, 'code') },
-  { pattern: /^#\/repo\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/?(.*)$/, handler: async (o, n, b, p) => { state.branch = b; await renderRepo(api, o, n, 'code', decodeURIComponent(p || '') || b); } },
-  { pattern: /^#\/repo\/([^/]+)\/([^/]+)\/tree\/([^/]+)$/, handler: async (o, n, b) => { state.branch = b; await renderRepo(api, o, n, 'code', b); } },
-  { pattern: /^#\/repo\/([^/]+)\/([^/]+)\/preview$/, handler: async (o, n) => renderRepo(api, o, n, 'preview') },
-  { pattern: /^#\/repo\/([^/]+)\/([^/]+)\/settings$/, handler: async (o, n) => renderRepo(api, o, n, 'settings') }
+  { pattern: /^#\/repo\/([^/]+)\/([^/]+)$/, handler: async (o, n) => {
+      state.branch = 'main';
+      await renderRepo(api, decodeURIComponent(o), decodeURIComponent(n), 'code', '');
+    }
+  },
+  { pattern: /^#\/repo\/([^/]+)\/([^/]+)\/tree\/([^/]+)(?:\/(.*))?$/, handler: async (o, n, b, p) => {
+      state.branch = decodeURIComponent(b);
+      const path = p ? decodeURIComponent(p) : '';
+      await renderRepo(api, decodeURIComponent(o), decodeURIComponent(n), 'code', path);
+    }
+  },
+  { pattern: /^#\/repo\/([^/]+)\/([^/]+)\/preview$/, handler: async (o, n) => renderRepo(api, decodeURIComponent(o), decodeURIComponent(n), 'preview', '') },
+  { pattern: /^#\/repo\/([^/]+)\/([^/]+)\/settings$/, handler: async (o, n) => renderRepo(api, decodeURIComponent(o), decodeURIComponent(n), 'settings', '') }
 ];
 
 async function route() {
