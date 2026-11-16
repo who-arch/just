@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>404 — NexusGit</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0a0a0f; color: #e5e7eb; font-family: 'Inter', system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  .gradient { background: linear-gradient(135deg, #a78bfa 0%, #06b6d4 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  a { color: #22d3ee; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .btn { display: inline-flex; padding: 0.6rem 1.2rem; border-radius: 0.5rem; background: linear-gradient(135deg, #7c3aed, #06b6d4); color: white; font-weight: 600; transition: all 0.2s; }
+  .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+</style>
+<script>
+  // GitHub Pages SPA-style fallback: redirect any 404 to the hash router
+  if (location.pathname !== '/' && !location.pathname.endsWith('/404.html')) {
+    var path = location.pathname.replace(/^\/|\/$/g, '');
+    location.replace('/#' + '/' + path + location.search + location.hash);
+  }
+</script>
+</head>
+<body>
+  <div class="text-center px-6">
+    <div class="text-8xl font-bold gradient mb-4">404</div>
+    <h1 class="text-2xl font-semibold text-white mb-2">Page not found</h1>
+    <p class="text-gray-400 mb-6 max-w-md mx-auto">The page you're looking for doesn't exist — or it was moved. Let's get you back to code.</p>
+    <a href="/" class="btn">← Back to NexusGit</a>
+    <div class="mt-8 text-xs text-gray-500">
+      If the page was a repository, try <a href="/#/">searching from home</a>.
+    </div>
+  </div>
+</body>
+</html>
