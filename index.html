@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="NexusGit — Premium AI Developer Platform" />
+<title>NexusGit — AI Developer Platform</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        bg: '#0a0a0f',
+        panel: '#12121a',
+        panel2: '#16161f',
+        border: '#1e1e2e',
+        border2: '#2a2a3c',
+        accent: '#7c3aed',
+        accent2: '#06b6d4',
+        muted: '#8b8b9e'
+      },
+      fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'], mono: ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+    }
+  }
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/premium.css">
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+window.monacoReady = new Promise((resolve) => {
+  if (typeof require === 'undefined') return resolve(null);
+  require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+  require(['vs/editor/editor.main'], () => resolve(window.monaco));
+});
+</script>
+</head>
+<body class="bg-bg text-gray-200 min-h-screen antialiased overflow-x-hidden">
+  <div id="bootScreen" class="fixed inset-0 z-[100] bg-bg flex items-center justify-center">
+    <div class="text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-accent to-accent2 flex items-center justify-center animate-pulse">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="text-lg font-semibold gradient-text">NexusGit</div>
+      <div class="text-xs text-muted mt-1">Booting platform…</div>
+    </div>
+  </div>
+
+  <header id="topnav" class="sticky top-0 z-40 backdrop-blur-xl bg-bg/80 border-b border-border">
+    <div class="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
+      <a href="#/" class="flex items-center gap-2 font-bold text-white">
+        <span class="w-7 h-7 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
+        </span>
+        <span class="gradient-text hidden sm:inline">NexusGit</span>
+      </a>
+      <nav id="globalNav" class="flex items-center gap-1 text-sm">
+        <a href="#/" class="nav-link">Home</a>
+        <a href="#/explore" class="nav-link">Explore</a>
+        <a href="#/profile" class="nav-link">Profile</a>
+        <span id="globalNavModules" class="flex items-center gap-1"></span>
+      </nav>
+      <div class="flex-1"></div>
+      <button id="cmdBtn" class="hidden sm:flex items-center gap-2 text-xs text-muted bg-panel border border-border rounded-lg px-3 py-1.5 hover:border-border2 transition">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        <span>Search…</span>
+        <kbd class="ml-2 px-1.5 py-0.5 rounded bg-panel2 border border-border text-[10px]">⌘K</kbd>
+      </button>
+      <a href="#/new" class="btn-primary text-xs"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline"><path d="M12 5v14M5 12h14"/></svg> New</a>
+      <div id="userMenu" class="relative"></div>
+    </div>
+  </header>
+
+  <main id="app" class="max-w-7xl mx-auto px-4 py-6 pb-24"></main>
+
+  <div id="modalRoot"></div>
+  <div id="drawerRoot"></div>
+  <div id="toasts" class="fixed bottom-4 right-4 z-[80] space-y-2"></div>
+
+  <div id="cmdPalette" class="hidden fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[15vh]">
+    <div class="w-full max-w-xl bg-panel border border-border2 rounded-xl shadow-2xl overflow-hidden">
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-border">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b8b9e" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input id="cmdInput" placeholder="Type a command or search…" class="flex-1 bg-transparent outline-none text-sm" autocomplete="off"/>
+        <kbd class="px-1.5 py-0.5 rounded bg-panel2 border border-border text-[10px]">ESC</kbd>
+      </div>
+      <div id="cmdResults" class="max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
