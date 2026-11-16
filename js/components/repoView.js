@@ -24,7 +24,6 @@ export async function renderRepo(api, owner, name, subview = '', extra = '') {
   const branches = await DB.getBranches(repoId);
   const branchList = branches.map(b => b.name);
   let currentBranch = api.state.branch || 'main';
-  if (extra) currentBranch = extra;
   if (!branchList.includes(currentBranch)) currentBranch = 'main';
   api.state.branch = currentBranch;
 
@@ -88,6 +87,7 @@ export async function renderRepo(api, owner, name, subview = '', extra = '') {
     try {
       const newRepo = await DB.forkRepo(repoId, api.state.user.username);
       api.toast('Forked!', 'success');
+      api.state.branch = 'main';
       api.navigate(`#/repo/${newRepo.id}`);
     } catch (e) { api.toast(e.message, 'error'); }
   };
@@ -106,7 +106,9 @@ export async function renderRepo(api, owner, name, subview = '', extra = '') {
       repoId, branch: currentBranch, files: names,
       onCommit: async (msg) => {
         await commitFiles(repoId, currentBranch, files, msg, api.state.user.username);
+        await DB.touchRepo(repoId);
         api.toast('Files uploaded', 'success');
+        api.state.branch = currentBranch;
         renderRepo(api, owner, name, subview, extra);
       }
     });
@@ -123,7 +125,7 @@ async function renderCodeTab(api, repo, branch, branchList, container, extra) {
   const commits = await DB.getCommits(repoId, branch);
   const latest = commits[0];
   const files = await DB.getFiles(repoId, branch);
-  const activePath = extra || null;
+
   container.innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
       <div class="lg:col-span-1 card p-3">
@@ -167,36 +169,49 @@ async function renderCodeTab(api, repo, branch, branchList, container, extra) {
     </div>`;
 
   document.getElementById('branchSelect').onchange = (e) => {
-    api.state.branch = e.target.value;
-    api.navigate(`#/repo/${repoId}/tree/${e.target.value}`);
+    const newBranch = e.target.value;
+    const filePart = currentPath ? `/${currentPath}` : '';
+    api.state.branch = newBranch;
+    api.navigate(`#/repo/${repoId}/tree/${newBranch}${filePart}`);
   };
+
   document.getElementById('newBranchBtn').onclick = async () => {
-    const name = prompt('New branch name:');
-    if (!name) return;
+    const raw = prompt('New branch name:');
+    if (!raw || !raw.trim()) return;
+    const name = raw.trim();
+    if (!/^[a-zA-Z0-9._/-]+$/.test(name)) return api.toast('Invalid branch name', 'error');
     try {
       await DB.createBranch(repoId, name, branch, api.state.user.username);
       api.toast('Branch created', 'success');
-      renderRepo(api, repo.owner, repo.name, 'code', name);
+      api.state.branch = name;
+      api.navigate(`#/repo/${repoId}/tree/${name}`);
     } catch (e) { api.toast(e.message, 'error'); }
   };
+
   document.getElementById('newFileBtn').onclick = async () => {
-    const path = prompt('File path (e.g. src/App.js):');
-    if (!path) return;
-    await DB.saveFile(repoId, branch, path, '');
+    const raw = prompt('File path (e.g. src/App.js):');
+    if (!raw || !raw.trim()) return;
+    const path = raw.trim().replace(/^\/+/, '');
+    const existing = await DB.getFile(repoId, branch, path);
+    if (existing) return api.toast('File already exists', 'error');
+    await DB.commit(repoId, branch, [{ path, content: '' }], `Create ${path}`, api.state.user.username);
+    await DB.touchRepo(repoId);
+    api.toast('File created', 'success');
+    api.state.branch = branch;
     api.navigate(`#/repo/${repoId}/tree/${branch}/${path}`);
   };
 
   const treeEl = document.getElementById('fileTree');
   const editorEl = document.getElementById('editorContainer');
   let editor = null;
-  let currentPath = activePath || files[0]?.path || null;
+  let currentPath = extra && files.find(f => f.path === extra) ? extra : null;
 
   async function loadFile(path) {
-    currentPath = path;
-    api.state.currentFile = path;
-    history.replaceState(null, '', `#/repo/${repoId}/tree/${branch}/${path}`);
     const file = await DB.getFile(repoId, branch, path);
     if (!file) return;
+    currentPath = path;
+    api.state.currentFile = path;
+    history.replaceState(null, '', `#/repo/${repoId}/tree/${branch}/${path.split('/').map(encodeURIComponent).join('/')}`);
     editorEl.innerHTML = `
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2 text-sm">
@@ -213,21 +228,25 @@ async function renderCodeTab(api, repo, branch, branchList, container, extra) {
     editor = await mountEditor(document.getElementById('monacoHost'), { value: file.content, path });
     document.getElementById('saveFileBtn').onclick = async () => {
       const newContent = editor.getValue();
-      const names = [path];
       renderCommitModal({
-        repoId, branch, files: names,
+        repoId, branch, files: [path],
         onCommit: async (msg) => {
           await commitFiles(repoId, branch, [{ path, content: newContent }], msg, api.state.user.username);
+          await DB.touchRepo(repoId);
           api.toast('Committed', 'success');
-          renderRepo(api, repo.owner, repo.name, 'code', branch);
+          api.state.branch = branch;
+          renderRepo(api, repo.owner, repo.name, 'code', path);
         }
       });
     };
     document.getElementById('deleteFileBtn').onclick = async () => {
       if (!confirm(`Delete ${path}?`)) return;
       await DB.deleteFile(repoId, branch, path);
+      await DB.commit(repoId, branch, [], `Delete ${path}`, api.state.user.username);
+      await DB.touchRepo(repoId);
       api.toast('Deleted', 'success');
-      renderRepo(api, repo.owner, repo.name, 'code', branch);
+      api.state.branch = branch;
+      api.navigate(`#/repo/${repoId}/tree/${branch}`);
     };
     document.getElementById('aiExplainBtn').onclick = async () => {
       const panel = document.getElementById('aiPanel');
@@ -236,12 +255,16 @@ async function renderCodeTab(api, repo, branch, branchList, container, extra) {
       const out = await AI.explainCode(editor.getValue(), path);
       panel.innerHTML = `<div class="text-xs text-muted mb-2">🤖 NexusGit Copilot</div><div class="markdown">${marked.parse(out)}</div>`;
     };
+    treeEl.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
+    const target = treeEl.querySelector(`.tree-item[data-path="${path.replace(/"/g, '\\"')}"]`);
+    if (target) target.classList.add('active');
   }
 
   await renderFileTree(treeEl, {
     repoId, branch, activePath: currentPath,
     onSelect: loadFile
   });
+
   if (currentPath) await loadFile(currentPath);
   else editorEl.innerHTML = '<div class="text-center text-muted text-sm py-12">Select or create a file to start editing</div>';
 }
@@ -287,11 +310,11 @@ async function renderSettingsTab(api, repo, container) {
       </div>
     </div>`;
   document.getElementById('saveSettings').onclick = async () => {
-    repo.name = document.getElementById('setName').value.trim() || repo.name;
     repo.description = document.getElementById('setDesc').value;
     repo.isPrivate = document.getElementById('setPrivate').checked;
     await DB.put('repos', repo);
     api.toast('Settings saved', 'success');
+    renderRepo(api, repo.owner, repo.name, 'settings', '');
   };
   document.getElementById('deleteRepo').onclick = async () => {
     if (!confirm('Delete this repository permanently?')) return;
