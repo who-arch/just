@@ -61,6 +61,7 @@ export async function renderFileTree(container, { repoId, branch, activePath, on
         const item = document.createElement('div');
         item.className = 'tree-item' + (child.path === activePath ? ' active' : '');
         item.style.paddingLeft = `${depth * 12 + 8}px`;
+        item.dataset.path = child.path;
         item.innerHTML = `<span>${iconForFile(child.name)}</span><span class="truncate">${child.name}</span>`;
         item.onclick = () => onSelect(child.path);
         root.appendChild(item);
@@ -91,6 +92,7 @@ async function renderNodeInto(container, dirNode, depth, activePath, onSelect) {
       const item = document.createElement('div');
       item.className = 'tree-item' + (child.path === activePath ? ' active' : '');
       item.style.paddingLeft = `${depth * 12 + 8}px`;
+      item.dataset.path = child.path;
       item.innerHTML = `<span>${iconForFile(child.name)}</span><span class="truncate">${child.name}</span>`;
       item.onclick = () => onSelect(child.path);
       container.appendChild(item);
