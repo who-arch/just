@@ -1,9 +1,5 @@
 const DB_NAME = 'nexusgit';
 const DB_VERSION = 1;
-const STORES = [
-  'users', 'repos', 'files', 'commits', 'branches',
-  'issues', 'prs', 'comments', 'contributions'
-];
 
 let _db = null;
 
@@ -91,29 +87,12 @@ const DB = {
     return _db;
   },
 
-  async put(store, obj) {
-    return wrap(tx(store, 'readwrite').put(obj));
-  },
-
-  async get(store, key) {
-    return wrap(tx(store).get(key));
-  },
-
-  async getAll(store) {
-    return wrap(tx(store).getAll());
-  },
-
-  async getAllBy(store, index, value) {
-    return wrap(tx(store).index(index).getAll(value));
-  },
-
-  async delete(store, key) {
-    return wrap(tx(store, 'readwrite').delete(key));
-  },
-
-  async clear(store) {
-    return wrap(tx(store, 'readwrite').clear());
-  },
+  async put(store, obj) { return wrap(tx(store, 'readwrite').put(obj)); },
+  async get(store, key) { return wrap(tx(store).get(key)); },
+  async getAll(store) { return wrap(tx(store).getAll()); },
+  async getAllBy(store, index, value) { return wrap(tx(store).index(index).getAll(value)); },
+  async delete(store, key) { return wrap(tx(store, 'readwrite').delete(key)); },
+  async clear(store) { return wrap(tx(store, 'readwrite').clear()); },
 
   async seed() {
     const users = await DB.getAll('users');
@@ -234,7 +213,7 @@ const DB = {
       { path: 'LICENSE', content: 'MIT License\n\nCopyright (c) ' + new Date().getFullYear() + ' ' + owner + '\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software…\n' }
     ];
 
-    const commitSha = await DB.commit(id, 'main', files, 'Initial commit', owner);
+    await DB.commit(id, 'main', files, 'Initial commit', owner);
     await DB.recordContribution(owner, 1);
     return repo;
   },
@@ -253,7 +232,7 @@ const DB = {
 
     const commit = { sha, repoId, branch, message, author, timestamp: now, files: tree.map(f => f.path) };
     await DB.put('commits', commit);
-    await DB.recordContribution(author, 1);
+    if (author) await DB.recordContribution(author, 1);
     return sha;
   },
 
@@ -294,6 +273,7 @@ const DB = {
     const existing = await DB.get('branches', id);
     if (existing) throw new Error('Branch exists');
     const files = await DB.getFiles(repoId, fromBranch);
+    const parentCommits = await DB.getCommits(repoId, fromBranch);
     await DB.put('branches', { id, repoId, name, createdAt: Date.now(), isDefault: false });
     for (const f of files) {
       await DB.put('files', {
@@ -301,6 +281,11 @@ const DB = {
         repoId, branch: name, path: f.path, content: f.content, updatedAt: Date.now()
       });
     }
+    for (const c of parentCommits) {
+      const newSha = await sha1(`${repoId}:${name}:${c.sha}:${c.timestamp}`);
+      await DB.put('commits', { ...c, sha: newSha, branch: name });
+    }
+    if (author) await DB.recordContribution(author, 1);
     return DB.get('branches', id);
   },
 
@@ -405,13 +390,12 @@ const DB = {
       createdAt: Date.now(), updatedAt: Date.now(),
       starred: []
     };
-    delete newRepo.forkedFrom;
-    newRepo.forkedFrom = repoId;
     await DB.put('repos', newRepo);
 
     const branches = await DB.getBranches(repoId);
     for (const b of branches) {
       const files = await DB.getFiles(repoId, b.name);
+      const commits = await DB.getCommits(repoId, b.name);
       await DB.put('branches', { id: `${newId}:${b.name}`, repoId: newId, name: b.name, createdAt: Date.now(), isDefault: b.isDefault });
       for (const f of files) {
         await DB.put('files', {
@@ -419,10 +403,10 @@ const DB = {
           repoId: newId, branch: b.name, path: f.path, content: f.content, updatedAt: Date.now()
         });
       }
-    }
-    const commits = await DB.getCommits(repoId);
-    for (const c of commits) {
-      await DB.put('commits', { ...c, repoId: newId });
+      for (const c of commits) {
+        const newSha = await sha1(`${newId}:${b.name}:${c.sha}:${c.timestamp}`);
+        await DB.put('commits', { ...c, sha: newSha, repoId: newId });
+      }
     }
     repo.forks = (repo.forks || 0) + 1;
     await DB.put('repos', repo);
