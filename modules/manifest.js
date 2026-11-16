@@ -1,0 +1,1 @@
+export default ['issues', 'aiAssistant'];
